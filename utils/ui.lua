@@ -1,49 +1,88 @@
-local function get_gui_screen_from_player(player)
-    return player.gui.screen.spmc_main_frame
-end
-
-local function get_science_table_from_main_frame(frame)
-    if frame.spmc_inner_frame == nil then
-        return nil
+local function pack_in_elements(pack, elements)
+    for _, element in pairs(elements) do
+        if string.find(element.name, pack) then
+            return true
+        end
     end
 
-    return frame.spmc_inner_frame.spmc_science_table
+    return false
 end
 
-function update_science_table(spmc_gui)
+local function find_in_elements(elements, type, name)
+    for _, element in pairs(elements) do
+        if string.find(element, type) and string.find(element, name) then
+            return element
+        end
+    end
+
+    return nil
+end
+
+function update_spmc(spmc_gui)
     if spmc_gui == nil then
         game.print("[ERROR][SPMC] Main GUI hasn't been created.")
         return
     end
 
-    local science_table = get_science_table_from_main_frame(spmc_gui)
+    local science_table = spmc_gui.spmc_inner_frame.spmc_science_table
 
     if science_table == nil then
         game.print("[ERROR][SPMC] Science table hasn't been created.")
         return
     end
 
-    if storage.spm_data ~= nil then
-        science_table.clear()
-        spmc_gui.spmc_inner_frame.spmc_science_table_no_research.visible = false
-        science_table.visible = true
+    if storage.current_spm == nil or storage.current_spm == {} then
+        game.print("[ERROR][SPMC] Science SPM hasn't been calculated.")
+        return
+    end
 
-        for name, item in pairs(storage.spm_data) do
-            local science_elem = science_table.add { type = "flow", name = "spmc_science_element_" .. name, direction = "horizontal", horizontally_stretchable = true }
-            science_elem.style.vertical_align = "center"
-            science_elem.style.padding = 2
-            science_elem.style.horizontally_stretchable = true
-            local icon = science_elem.add { type = "sprite-button", name = "spmc_science_sprite_" .. name, sprite = "item/" .. name, tooltip = { item.item.name } }
-            local bar = science_elem.add { type = "progressbar", style = "progressbar", value = (storage.current_spm[name] / item.required) }
-            local total_label = science_elem.add { type = "label", name = "spmc_science_made_" .. name, caption = storage.current_spm[name] .. " / " .. item.required .. " SPM" }
-            total_label.style.font = "default-bold"
-            total_label.style.width = 100
-            total_label.style.horizontal_align = "right"
-            total_label.style.left_padding = 8
-            if storage.current_spm[name] >= item.required then
-                total_label.style.font_color = { 0.42, 0.86, 0.3 }
+    local elements = science_table.children
+
+    for name, _ in pairs(storage.science_pack_data) do
+        if pack_in_elements(name, elements) then
+            local science_element = find_in_elements(elements, "element", name)
+
+            if science_element == nil then
+                game.print("[ERROR][SCPM] Couldn't find parent element for " .. name)
+                return
+            end
+
+            local parent_elements = science_element.children
+            local science_progressbar = find_in_elements(parent_elements, "progressbar", name)
+            local science_label = find_in_elements(parent_elements, "label", name)
+
+            local max_grace = settings.startup["grace-period-time"].value
+            local grace_progessbar = spmc_gui.spmc_inner_frame.spmc_grace_period_progressbar
+            local grace_label = spmc_gui.spmc_inner_frame.spmc_grace_caption
+
+            if science_progressbar == nil then
+                game.print("[ERROR][SCPM] Couldn't find progressbar for " .. name)
+                return
+            end
+
+            if science_label == nil then
+                game.print("[ERROR][SCPM] Couldn't find label for " .. name)
+                return
+            end
+
+            if storage.required_spm ~= {} then
+                science_progressbar.value = storage.current_spm[name] / storage.required_spm[name]
+                science_label.caption = storage.current_spm[name].." / "..storage.required_spm[name].." SPM"
+
+                if storage.current_spm[name] >= storage.required_spm[name] then
+                    science_label.style.font_color = { 0.42, 0.86, 0.3 }
+                else
+                    science_label.style.font_color = { 1, 0.35, 0.1 }
+                end
+
+                grace_progessbar.value = storage.grace / max_grace
+                grace_label.caption = "Grace period left: "..storage.grace.."s"
             else
-                total_label.style.font_color = { 1, 0.35, 0.1 }
+                science_progressbar.value = 1
+                science_label.caption = storage.current_spm[name] .. " SPM"
+
+                grace_progessbar.value = 1
+                grace_label.caption = "No research active!"
             end
         end
     end
@@ -76,11 +115,26 @@ function create_ui(player)
     storage.players[player.index].spmc_gui.visible = false
 
     local inner_ui = storage.players[player.index].spmc_gui.add { type = "frame", name = "spmc_inner_frame", style = "inside_shallow_frame_with_padding" }
-    inner_ui.add { type = "label", name = "spmc_science_title", caption = "Science production", style = "subheader_label" }
-    science_table = inner_ui.add { type = "scroll-pane", name = "spmc_science_table", vertical_centering = true, visible = false, direction = "vertical", style = "scroll_pane" }
-    inner_ui.add { type = "label", name = "spmc_grace_title", caption = "Grace period", style = "subheader_label" }
-    inner_ui.add { type = "progressbar", name = "spmc_grace_period_progressbar", style = "progressbar", value = 1 }
-    inner_ui.add { type = "label", name = "spmc_grace_caption", caption = "No research selected!" }
+    local inner_flow = inner_ui.add{type="flow", direction="vertical"}
+    inner_flow.add { type = "label", name = "spmc_science_title", caption = "Science production", style = "subheader_label" }
+    local science_table = inner_flow.add { type = "scroll-pane", name = "spmc_science_table", vertical_centering = true, visible = false, direction = "vertical", style = "scroll_pane" }
+    inner_flow.add { type = "label", name = "spmc_grace_title", caption = "Grace period", style = "subheader_label" }
+    inner_flow.add { type = "progressbar", name = "spmc_grace_period_progressbar", style = "progressbar", value = 1 }
+    inner_flow.add { type = "label", name = "spmc_grace_caption", caption = "No research selected!" }
+
+    for name, item in pairs(storage.science_pack_data) do
+        local science_elem = science_table.add { type = "flow", name = "spmc_science_element_" .. name, direction = "horizontal", horizontally_stretchable = true }
+        science_elem.style.vertical_align = "center"
+        science_elem.style.padding = 2
+        science_elem.style.horizontally_stretchable = true
+        science_elem.add { type = "sprite-button", name = "spmc_science_sprite_" .. name, sprite = "item/" .. name, tooltip = { item.name } }
+        science_elem.add { type = "progressbar", name = "spmc_science_progressbar_"..name, style = "progressbar", value = 1 }
+        local total_label = science_elem.add { type = "label", name = "spmc_science_label_" .. name, caption = "0 SPM" }
+        total_label.style.font = "default-bold"
+        total_label.style.width = 100
+        total_label.style.horizontal_align = "right"
+        total_label.style.left_padding = 8
+    end
 end
 
 function toggle_interface(player)
@@ -99,39 +153,4 @@ function close_interface(player)
     if player ~= nil then
         storage.players[player.index].spmc_gui.visible = false
     end
-end
-
-function show_science_table(spmc_gui)
-    if spmc_gui == nil then
-        game.print("[ERROR][SPMC] Main GUI hasn't been created.")
-        return
-    end
-
-    local science_table = get_science_table_from_main_frame(spmc_gui)
-
-    if science_table == nil then
-        game.print("[ERROR][SPMC] Science table hasn't been created hasn't been created.")
-        return
-    end
-
-    science_table.visible = true
-    spmc_gui.spmc_inner_frame.spmc_science_table_no_research.visible = false
-end
-
-function clear_science_table(spmc_gui)
-    if spmc_gui == nil then
-        game.print("[ERROR][SPMC] Main GUI hasn't been created.")
-        return
-    end
-
-    local science_table = get_science_table_from_main_frame(spmc_gui)
-
-    if science_table == nil then
-        game.print("[ERROR][SPMC] Science table hasn't been created hasn't been created.")
-        return
-    end
-
-    science_table.clear()
-    science_table.visible = false
-    spmc_gui.spmc_inner_frame.spmc_science_table_no_research.visible = true
 end

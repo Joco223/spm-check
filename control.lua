@@ -5,17 +5,24 @@ local function init_storage(player)
     if storage.players == nil then
         storage.players = {}
     end
+
     if storage.players[player.index] == nil then
         storage.players[player.index] = { spmc_gui = nil }
     end
+
+    storage.grace = 5
 end
 
 script.on_event(defines.events.on_player_created, function(event)
-    init_storage(game.get_player(event.player_index))
-    create_ui(game.get_player(event.player_index))
+    local player = game.get_player(event.player_index)
+    init_storage(player)
+    create_ui(player)
 
-    script.on_nth_tick(30, function ()
-        test_science_data()
+    script.on_nth_tick(30, function()
+        storage.current_spm = {}
+        local spm_data = is_spm_valid_research()
+        storage.required_spm = spm_data
+        update_spmc(storage.players[player.index].spmc_gui)
     end)
 end)
 
@@ -32,32 +39,15 @@ script.on_event(defines.events.on_lua_shortcut, function(event)
 end)
 
 script.on_event(defines.events.on_research_started, function(event)
-    for _, player in pairs(storage.players) do
-        update_science_table(player.spmc_gui)
-    end
-    script.on_nth_tick(300, function()
-        storage.current_spm = {}
-        status, spm_data = is_spm_valid_research()
-        storage.spm_data = spm_data
-        if not status then
-            for _, player in pairs(storage.players) do
-                clear_science_table(player.spmc_gui)
-            end
-        end
-        script.on_nth_tick(300, nil)
-    end)
+    storage.grace = 5
 end)
 
 script.on_event(defines.events.on_research_cancelled, function(event)
-    for _, player in pairs(storage.players) do
-        clear_science_table(player.spmc_gui)
-    end
+    storage.required_spm = {}
 end)
 
 script.on_event(defines.events.on_research_finished, function(event)
-    for _, player in pairs(storage.players) do
-        clear_science_table(player.spmc_gui)
-    end
+    storage.required_spm = {}
 end)
 
 script.on_event("spmc_toggle_interface", function(event)
@@ -66,15 +56,14 @@ end)
 
 script.on_init(function()
     storage.players = {}
+    storage.science_pack_data = update_science_pack_data()
+    storage.current_spm = {}
 
     -- Initializing player data
     for _, player in pairs(game.players) do
         init_storage(player)
     end
 
-    -- Initialzing science data
-    storage.science_pack_data = update_science_pack_data()
-    storage.current_spm = {}
 
     for _, player in pairs(game.players) do
         local spmc_gui = player.gui.screen.spmc_gui
