@@ -13,7 +13,7 @@ data:extend({
     type = "int-setting",
     name = "grace-period-time",
     setting_type = "startup",
-    default_value = 5,
+    default_value = 10,
     minimum_value = 1,
     maximum_value = 60,
     order = "b",

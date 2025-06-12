@@ -29,6 +29,22 @@ script.on_event(defines.events.on_player_created, function(event)
     end)
 end)
 
+script.on_load(function()
+    script.on_nth_tick(30, function()
+        is_spm_valid_research()
+
+        for _, player in pairs(game.players) do
+            update_spmc(storage.players[player.index].spmc_gui)
+        end
+
+        if storage.grace == 0 then
+            game.forces.player.cancel_current_research()
+            game.print("Research failed! Not enough SPM")
+            storage.grace = settings.startup["grace-period-time"].value * 2
+        end
+    end)
+end)
+
 script.on_event(defines.events.on_gui_click, function(event)
     if event.element.name == "scpm_close_ui" then
         close_interface(game.get_player(event.player_index))

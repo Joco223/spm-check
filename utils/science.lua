@@ -70,11 +70,8 @@ function is_spm_valid_research()
     end
 
     if fail then
-        game.print("check failed")
         storage.grace = storage.grace - 1
-    end
-
-    if storage.required_spm ~= nil then
-        game.print(#storage.required_spm.." asdnasiuhgdisa")
+    else
+        storage.grace = settings.startup["grace-period-time"].value * 2
     end
 end

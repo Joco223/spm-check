@@ -51,7 +51,7 @@ function update_spmc(spmc_gui)
             local science_progressbar = find_in_elements(parent_elements, "progressbar", name)
             local science_label = find_in_elements(parent_elements, "label", name)
 
-            local max_grace = settings.startup["grace-period-time"].value
+            local max_grace = settings.startup["grace-period-time"].value * 2
             local grace_progessbar = spmc_gui.spmc_inner_frame_lower.spmc_inner_flow_lower.spmc_grace_period_progressbar
             local grace_label = spmc_gui.spmc_inner_frame_lower.spmc_inner_flow_lower.spmc_grace_caption
 
@@ -65,21 +65,22 @@ function update_spmc(spmc_gui)
                 return
             end
 
-            if storage.required_spm ~= nil and #storage.required_spm ~= 0 then
-                science_progressbar.value = storage.current_spm[name] / storage.required_spm[name]
-                science_label.caption = storage.current_spm[name].." / "..storage.required_spm[name].." SPM"
+            if storage.required_spm ~= nil and storage.required_spm[name] ~= nil then
+                science_progressbar.value = storage.current_spm[name] / storage.required_spm[name].required
+                science_label.caption = storage.current_spm[name].." / "..storage.required_spm[name].required.." SPM"
 
-                if storage.current_spm[name] >= storage.required_spm[name] then
+                if storage.current_spm[name] >= storage.required_spm[name].required then
                     science_label.style.font_color = { 0.42, 0.86, 0.3 }
                 else
                     science_label.style.font_color = { 1, 0.35, 0.1 }
                 end
 
                 grace_progessbar.value = storage.grace / max_grace
-                grace_label.caption = "Grace period left: "..storage.grace.."s"
+                grace_label.caption = "Grace period left: "..(storage.grace / 2).."s"
             else
                 science_progressbar.value = 1
                 science_label.caption = storage.current_spm[name] .. " SPM"
+                science_label.style.font_color = { 1, 1, 1}
 
                 grace_progessbar.value = 1
                 grace_label.caption = "No research active!"
@@ -142,7 +143,7 @@ function create_ui(player)
         science_elem.style.vertical_align = "center"
         science_elem.style.padding = 2
         science_elem.style.horizontally_stretchable = true
-        science_elem.add { type = "sprite-button", name = "spmc_science_sprite_" .. name, sprite = "item/" .. name, tooltip = { item.name } }
+        science_elem.add { type = "sprite-button", name = "spmc_science_sprite_" .. name, sprite = "item/" .. name, tooltip = item.localised_name }
         local progress = science_elem.add { type = "progressbar", name = "spmc_science_progressbar_" .. name, style = "progressbar", value = 1 }
         progress.style.horizontally_stretchable = true
         progress.style.natural_width = 300
