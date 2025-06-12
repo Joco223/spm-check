@@ -17,12 +17,18 @@ function update_science_pack_spm()
         return
     end
 
+    -- Reseting data
+
+    for _, sp in pairs(storage.science_pack_data) do
+        storage.current_spm[sp.name] = 0
+    end
+
     for surface_name, _ in pairs(game.surfaces) do
         if game.forces.player then
             local stats = game.forces.player.get_item_production_statistics(surface_name)
             for _, sp in pairs(storage.science_pack_data) do
                 if storage.current_spm[sp.name] == nil then storage.current_spm[sp.name] = 0 end
-                storage.current_spm[sp.name] = storage.current_spm[sp.name] + stats.get_input_count(sp.name)
+                storage.current_spm[sp.name] = math.floor(storage.current_spm[sp.name] + stats.get_flow_count { name = sp.name, category = "input", precision_index = defines.flow_precision_index.one_minute, count = true } + 0.5)
             end
         else
             game.print("[ERROR][SPMC] No player or force found to calculate science pack rates.")
@@ -34,13 +40,15 @@ function is_spm_valid_research()
     update_science_pack_spm()
 
     if storage.grace == 0 then
-        return {}
+        storage.required_spm = {}
+        return
     end
 
     local current_research = game.forces.player.current_research or nil
 
     if current_research == nil then
-        return {}
+        storage.required_spm = {}
+        return
     end
 
     local research_ingredients = current_research.research_unit_ingredients
@@ -48,17 +56,13 @@ function is_spm_valid_research()
     local science_spoil_time = settings.startup["science-spoilage-time"].value
 
     local fail = false
-    local spm_data = {}
 
     for _, item in ipairs(research_ingredients) do
-        if storage.science_pack_data[item.name] == nil then
-            return
-        end
 
         local science_cost = item.amount * research_unit_count
         local required_spm = science_cost / science_spoil_time
 
-        spm_data[item.name] = { item = item, required = required_spm }
+        storage.required_spm[item.name] = { item = item, required = required_spm }
 
         if storage.current_spm[item.name] < required_spm then
             fail = true
@@ -66,10 +70,11 @@ function is_spm_valid_research()
     end
 
     if fail then
-        game.forces.player.cancel_current_research()
-        game.print("Not enough SPM to research this technology! Start research and open SPM Checker window to see how much you need.")
-        return spm_data
+        game.print("check failed")
+        storage.grace = storage.grace - 1
     end
 
-    return spm_data
+    if storage.required_spm ~= nil then
+        game.print(#storage.required_spm.." asdnasiuhgdisa")
+    end
 end

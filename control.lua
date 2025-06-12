@@ -10,7 +10,8 @@ local function init_storage(player)
         storage.players[player.index] = { spmc_gui = nil }
     end
 
-    storage.grace = 5
+    storage.grace = settings.startup["grace-period-time"].value * 2
+    storage.required_spm = {}
 end
 
 script.on_event(defines.events.on_player_created, function(event)
@@ -19,10 +20,12 @@ script.on_event(defines.events.on_player_created, function(event)
     create_ui(player)
 
     script.on_nth_tick(30, function()
-        storage.current_spm = {}
-        local spm_data = is_spm_valid_research()
-        storage.required_spm = spm_data
+        is_spm_valid_research()
         update_spmc(storage.players[player.index].spmc_gui)
+
+        if storage.grace == 0 then
+            game.forces.player.cancel_current_research()
+        end
     end)
 end)
 
@@ -39,7 +42,7 @@ script.on_event(defines.events.on_lua_shortcut, function(event)
 end)
 
 script.on_event(defines.events.on_research_started, function(event)
-    storage.grace = 5
+    storage.grace = settings.startup["grace-period-time"].value * 2
 end)
 
 script.on_event(defines.events.on_research_cancelled, function(event)

@@ -1,6 +1,6 @@
 local function pack_in_elements(pack, elements)
     for _, element in pairs(elements) do
-        if string.find(element.name, pack) then
+        if string.find(element.name, pack, 1, true) ~= nil then
             return true
         end
     end
@@ -10,7 +10,7 @@ end
 
 local function find_in_elements(elements, type, name)
     for _, element in pairs(elements) do
-        if string.find(element, type) and string.find(element, name) then
+        if string.find(element.name, type, 1, true) ~= nil and string.find(element.name, name, 1, true) ~= nil then
             return element
         end
     end
@@ -24,7 +24,7 @@ function update_spmc(spmc_gui)
         return
     end
 
-    local science_table = spmc_gui.spmc_inner_frame.spmc_science_table
+    local science_table = spmc_gui.spmc_inner_frame.spmc_inner_flow.spmc_science_table
 
     if science_table == nil then
         game.print("[ERROR][SPMC] Science table hasn't been created.")
@@ -52,8 +52,8 @@ function update_spmc(spmc_gui)
             local science_label = find_in_elements(parent_elements, "label", name)
 
             local max_grace = settings.startup["grace-period-time"].value
-            local grace_progessbar = spmc_gui.spmc_inner_frame.spmc_grace_period_progressbar
-            local grace_label = spmc_gui.spmc_inner_frame.spmc_grace_caption
+            local grace_progessbar = spmc_gui.spmc_inner_frame_lower.spmc_inner_flow_lower.spmc_grace_period_progressbar
+            local grace_label = spmc_gui.spmc_inner_frame_lower.spmc_inner_flow_lower.spmc_grace_caption
 
             if science_progressbar == nil then
                 game.print("[ERROR][SCPM] Couldn't find progressbar for " .. name)
@@ -65,7 +65,7 @@ function update_spmc(spmc_gui)
                 return
             end
 
-            if storage.required_spm ~= {} then
+            if storage.required_spm ~= nil and #storage.required_spm ~= 0 then
                 science_progressbar.value = storage.current_spm[name] / storage.required_spm[name]
                 science_label.caption = storage.current_spm[name].." / "..storage.required_spm[name].." SPM"
 
@@ -99,6 +99,7 @@ function create_ui(player)
     end
 
     storage.players[player.index].spmc_gui = player.gui.screen.add { type = "frame", name = "spmc_main_frame", direction = "vertical" }
+    storage.players[player.index].spmc_gui.style.natural_width = 400
     local title_flow = storage.players[player.index].spmc_gui.add { type = "flow", name = "title_flow" }
 
     local title = title_flow.add { type = "label", caption = { "spmc.ui_title" }, style = "frame_title" }
@@ -115,12 +116,26 @@ function create_ui(player)
     storage.players[player.index].spmc_gui.visible = false
 
     local inner_ui = storage.players[player.index].spmc_gui.add { type = "frame", name = "spmc_inner_frame", style = "inside_shallow_frame_with_padding" }
-    local inner_flow = inner_ui.add{type="flow", direction="vertical"}
-    inner_flow.add { type = "label", name = "spmc_science_title", caption = "Science production", style = "subheader_label" }
-    local science_table = inner_flow.add { type = "scroll-pane", name = "spmc_science_table", vertical_centering = true, visible = false, direction = "vertical", style = "scroll_pane" }
-    inner_flow.add { type = "label", name = "spmc_grace_title", caption = "Grace period", style = "subheader_label" }
-    inner_flow.add { type = "progressbar", name = "spmc_grace_period_progressbar", style = "progressbar", value = 1 }
-    inner_flow.add { type = "label", name = "spmc_grace_caption", caption = "No research selected!" }
+    local inner_flow = inner_ui.add { type = "flow", name = "spmc_inner_flow", direction = "vertical" }
+    inner_flow.style.horizontal_align = "center"
+    inner_flow.style.horizontally_stretchable = true
+    local science_title = inner_flow.add { type = "label", name = "spmc_science_title", caption = "Science production", style = "subheader_caption_label" }
+    science_title.style.font = "heading-2"
+    science_title.style.font_color = {1, 0.901961, 0.752941}
+    local science_table = inner_flow.add { type = "scroll-pane", name = "spmc_science_table", vertical_centering = true, direction = "vertical", style = "scroll_pane" }
+
+    local inner_lower_ui = storage.players[player.index].spmc_gui.add { type = "frame", name = "spmc_inner_frame_lower", style = "inside_shallow_frame_with_padding" }
+    local inner_flow_lower = inner_lower_ui.add { type = "flow", name = "spmc_inner_flow_lower", direction = "vertical" }
+    inner_flow_lower.style.horizontal_align = "center"
+    inner_flow_lower.style.horizontally_stretchable = true
+    local grace_title = inner_flow_lower.add { type = "label", name = "spmc_grace_title", caption = "Grace period", style = "subheader_label" }
+    grace_title.style.font = "heading-2"
+    grace_title.style.font_color = {1, 0.901961, 0.752941}
+    local progress_bar = inner_flow_lower.add { type = "progressbar", name = "spmc_grace_period_progressbar", style = "progressbar", value = 1 }
+    progress_bar.style.horizontally_stretchable = true
+    progress_bar.style.natural_width = 300
+    local grace_caption = inner_flow_lower.add { type = "label", name = "spmc_grace_caption", caption = "No research selected!", style="subheader_caption_label" }
+    grace_caption.style.font = "default-bold"
 
     for name, item in pairs(storage.science_pack_data) do
         local science_elem = science_table.add { type = "flow", name = "spmc_science_element_" .. name, direction = "horizontal", horizontally_stretchable = true }
@@ -128,12 +143,14 @@ function create_ui(player)
         science_elem.style.padding = 2
         science_elem.style.horizontally_stretchable = true
         science_elem.add { type = "sprite-button", name = "spmc_science_sprite_" .. name, sprite = "item/" .. name, tooltip = { item.name } }
-        science_elem.add { type = "progressbar", name = "spmc_science_progressbar_"..name, style = "progressbar", value = 1 }
+        local progress = science_elem.add { type = "progressbar", name = "spmc_science_progressbar_" .. name, style = "progressbar", value = 1 }
+        progress.style.horizontally_stretchable = true
+        progress.style.natural_width = 300
         local total_label = science_elem.add { type = "label", name = "spmc_science_label_" .. name, caption = "0 SPM" }
         total_label.style.font = "default-bold"
-        total_label.style.width = 100
+        total_label.style.natural_width = 80
         total_label.style.horizontal_align = "right"
-        total_label.style.left_padding = 8
+        total_label.style.left_padding = 4
     end
 end
 
